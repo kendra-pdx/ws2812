@@ -1,3 +1,5 @@
+use core::time::Duration;
+
 use esp_hal::{gpio::Level, time::Rate};
 use esp_hal::rmt::*;
 
@@ -18,16 +20,20 @@ impl<Tx: TxChannel> EspWS2812<Tx> {
             p0: symbol_to_pulse_code(&clk_freq, &Symbol::T0),
         }
     }
-
 }
 
 // https://docs.esp-rs.org/esp-idf-hal/src/esp_idf_hal/rmt.rs.html#137-144
-pub fn duration_to_ticks(frequency: &Rate, duration_ns: u64) -> u16 {
+pub fn duration_to_ticks(frequency: &Rate, duration: &Duration) -> u16 {
+    const NANOS_PER_SECOND: u32 = 1_000_000_000;
+
     let ticks_hz = frequency.as_hz();
+    let duration_ns = u32::try_from(duration.as_nanos())
+        .expect("Overflow in duration_to_ticks");
+
     let ticks = duration_ns
-        .checked_mul(u32::from(ticks_hz) as u64)
+        .checked_mul(ticks_hz)
         .expect("Overflow in duration_to_ticks")
-        / 1_000_000_000;
+        / NANOS_PER_SECOND;
 
     u16::try_from(ticks).expect("Overflow in duration_to_ticks")
 }
@@ -35,8 +41,8 @@ pub fn duration_to_ticks(frequency: &Rate, duration_ns: u64) -> u16 {
 fn symbol_to_pulse_code(clk_rate: &Rate, symbol: &Symbol) -> u32 {
     let Symbol { high, low } = symbol;
 
-    let high_ticks = duration_to_ticks(clk_rate, high.as_nanos() as u64);
-    let low_ticks = duration_to_ticks(clk_rate, low.as_nanos() as u64);
+    let high_ticks = duration_to_ticks(clk_rate, high);
+    let low_ticks = duration_to_ticks(clk_rate, low);
 
     PulseCode::new(Level::High, high_ticks, Level::Low, low_ticks)
 }
@@ -49,15 +55,10 @@ impl<Tx: TxChannel> WS2812 for EspWS2812<Tx> {
         let data = pixels
             .map(|px| px.into())
             .flat_map(|px: RGB8| px.to_bits::<bool>())
-            .map(|s| if s { self.p1 } else { self.p0 });
-
-        let data = 
-            // iter::once(reset)
-            iter::empty()
-            .chain(data)
+            .map(|s| if s { self.p1 } else { self.p0 })
             .chain(iter::once(end))
             .collect::<Vec<_>>();
-        
+
         let tx = self.tx.transmit(data.as_slice()).map_err(|e| e.into())?;
 
         let tx: Tx = tx.wait().map_err(|(e, _)| {
