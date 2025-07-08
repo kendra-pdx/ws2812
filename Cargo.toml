@@ -1,0 +1,31 @@
+[package]
+name = "ws2812"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+zerocopy = { version = "0.8", features = ["alloc", "derive"] }
+num-traits = { version = "0.2", default-features = false, features = ["libm"] }
+derive-new = { version = "0.7" }
+thiserror = { version = "2.0", default-features = false }
+
+# optional dependencies
+esp-hal = { version = "1.0.0-beta.1", optional = true, features = [
+  "defmt",
+  "unstable",
+] }
+
+bevy_color = { version = "0.16", optional = true, default-features = false, features = ["alloc", "libm" ]}
+defmt = { version = "1.0", optional = true }
+# frunk = "0.4.4"
+
+[features]
+testing = ["bevy"]
+default = ["bevy", "esp", "esp32s3", "defmt"]
+
+esp = ["dep:esp-hal"]
+esp32s3 = ["esp-hal?/esp32s3"]
+esp32 = ["esp-hal?/esp32"]
+bevy = ["dep:bevy_color"]
+defmt = ["dep:defmt"]
+std = []
