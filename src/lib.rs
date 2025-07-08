@@ -3,31 +3,34 @@
 #[macro_use]
 extern crate alloc;
 
+use cfg_if::cfg_if;
 use core::time::Duration;
 
 use crate::color::RGB8;
 
+mod bits;
 pub mod color;
 
 #[cfg(feature = "esp")]
 pub mod esp;
 
-mod bits;
+cfg_if! {
+    if #[cfg(feature = "timings_spec")] {
+        // https://cdn-shop.adafruit.com/datasheets/WS2812.pdf
+        pub const T0H: Duration = Duration::from_nanos(350);
+        pub const T0L: Duration = Duration::from_nanos(800);
 
-// https://cdn-shop.adafruit.com/datasheets/WS2812.pdf
-// pub const T0H: Duration = Duration::from_nanos(350);
-// pub const T0L: Duration = Duration::from_nanos(800);
+        pub const T1H: Duration = Duration::from_nanos(700);
+        pub const T1L: Duration = Duration::from_nanos(600);
+    } else {
+        // https://learn.adafruit.com/adafruit-neopixel-uberguide/advanced-coding
+        pub const T0H: Duration = Duration::from_nanos(400);
+        pub const T0L: Duration = Duration::from_nanos(850);
 
-// pub const T1H: Duration = Duration::from_nanos(700);
-// pub const T1L: Duration = Duration::from_nanos(600);
-
-// https://learn.adafruit.com/adafruit-neopixel-uberguide/advanced-coding
-pub const T0H: Duration = Duration::from_nanos(400);
-pub const T0L: Duration = Duration::from_nanos(850);
-
-pub const T1H: Duration = Duration::from_nanos(800);
-pub const T1L: Duration = Duration::from_nanos(450);
-
+        pub const T1H: Duration = Duration::from_nanos(800);
+        pub const T1L: Duration = Duration::from_nanos(450);
+    }
+}
 
 pub struct Symbol {
     high: Duration,

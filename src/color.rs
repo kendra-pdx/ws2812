@@ -1,8 +1,7 @@
 use crate::bits::ToBits;
 use num_traits::{Num, ToPrimitive};
-use zerocopy::{FromBytes, IntoBytes};
 
-#[derive(Debug, FromBytes, IntoBytes, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
 pub struct RGB<C: Num> {

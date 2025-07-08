@@ -1,9 +1,9 @@
 use core::time::Duration;
 
-use esp_hal::{gpio::Level, time::Rate};
 use esp_hal::rmt::*;
+use esp_hal::{gpio::Level, time::Rate};
 
-use crate::{bits::*, color::RGB8, Symbol, WS2812Error, WS2812};
+use crate::{Symbol, WS2812, WS2812Error, bits::*, color::RGB8};
 use alloc::vec::Vec;
 
 pub struct EspWS2812<Tx: TxChannel> {
@@ -14,21 +14,19 @@ pub struct EspWS2812<Tx: TxChannel> {
 
 impl<Tx: TxChannel> EspWS2812<Tx> {
     pub fn new(tx: Tx, clk_freq: Rate) -> Self {
-        EspWS2812 { 
-            tx, 
+        EspWS2812 {
+            tx,
             p1: symbol_to_pulse_code(&clk_freq, &Symbol::T1),
             p0: symbol_to_pulse_code(&clk_freq, &Symbol::T0),
         }
     }
 }
 
-// https://docs.esp-rs.org/esp-idf-hal/src/esp_idf_hal/rmt.rs.html#137-144
-pub fn duration_to_ticks(frequency: &Rate, duration: &Duration) -> u16 {
+fn duration_to_ticks(frequency: &Rate, duration: &Duration) -> u16 {
     const NANOS_PER_SECOND: u32 = 1_000_000_000;
 
     let ticks_hz = frequency.as_hz();
-    let duration_ns = u32::try_from(duration.as_nanos())
-        .expect("Overflow in duration_to_ticks");
+    let duration_ns = u32::try_from(duration.as_nanos()).expect("Overflow in duration_to_ticks");
 
     let ticks = duration_ns
         .checked_mul(ticks_hz)
@@ -61,9 +59,7 @@ impl<Tx: TxChannel> WS2812 for EspWS2812<Tx> {
 
         let tx = self.tx.transmit(data.as_slice()).map_err(|e| e.into())?;
 
-        let tx: Tx = tx.wait().map_err(|(e, _)| {
-            e.into()
-        })?;
+        let tx: Tx = tx.wait().map_err(|(e, _)| e.into())?;
 
         Ok(EspWS2812 { tx, ..self })
     }
@@ -71,6 +67,8 @@ impl<Tx: TxChannel> WS2812 for EspWS2812<Tx> {
 
 impl Into<WS2812Error> for esp_hal::rmt::Error {
     fn into(self) -> WS2812Error {
-        WS2812Error { msg: format!("ESP RMT Error: {:?}", self) }
+        WS2812Error {
+            msg: format!("ESP RMT Error: {:?}", self),
+        }
     }
 }
