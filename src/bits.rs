@@ -16,3 +16,9 @@ impl ToBits for u8 {
         ].into_iter().map(Bit::from)
     }
 }
+
+impl<const N: usize> ToBits for [u8; N] {
+    fn to_bits<Bit: From<bool>>(self) -> impl Iterator<Item = Bit> {
+        self.into_iter().flat_map(|byte| byte.to_bits::<Bit>())
+    }
+}

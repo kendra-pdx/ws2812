@@ -6,7 +6,7 @@ extern crate alloc;
 use cfg_if::cfg_if;
 use core::time::Duration;
 
-use crate::color::RGB8;
+use crate::color::ColorChannels;
 
 mod bits;
 pub mod color;
@@ -61,11 +61,11 @@ pub struct WS2812Error {
     msg: alloc::string::String,
 }
 
-pub trait WS2812
+pub trait WS2812<const N_COLOR_CHANNELS: usize>
 where
     Self: Sized,
 {
-    fn write(self, pixels: impl Iterator<Item = impl Into<RGB8>>) -> Result<Self, WS2812Error>;
+    fn write<Px: ColorChannels<u8, N_COLOR_CHANNELS>>(self, pixels: impl Iterator<Item = Px>) -> Result<Self, WS2812Error>;
 }
 
 #[cfg(feature = "defmt")]
