@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate alloc;
 
+use alloc::borrow::Cow;
 use cfg_if::cfg_if;
 use core::time::Duration;
 
@@ -55,22 +56,26 @@ impl From<bool> for Symbol {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, derive_new::new)]
 #[error("WS2812 Error: {msg}")]
-pub struct WS2812Error {
-    msg: alloc::string::String,
+pub struct WS2812Error<'m> {
+    #[new(into)]
+    msg: Cow<'m, str>,
 }
 
 pub trait WS2812<const N_COLOR_CHANNELS: usize>
 where
     Self: Sized,
 {
-    fn write<Px: ColorChannels<u8, N_COLOR_CHANNELS>>(self, pixels: impl Iterator<Item = Px>) -> Result<Self, WS2812Error>;
+    fn write<Px: ColorChannels<u8, N_COLOR_CHANNELS>>(
+        &self,
+        pixels: impl Iterator<Item = Px>,
+    ) -> Result<(), WS2812Error>;
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for WS2812Error {
+impl defmt::Format for WS2812Error<'_> {
     fn format(&self, fmt: defmt::Formatter) {
-        defmt::write!(fmt, "WS2812 Error: {}", self.msg.as_str());
+        defmt::write!(fmt, "WS2812 Error: {}", &self.msg.as_ref());
     }
 }

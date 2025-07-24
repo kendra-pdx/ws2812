@@ -1,22 +1,35 @@
+use alloc::vec::Vec;
 use core::time::Duration;
 
-use esp_hal::rmt::*;
+use crossbeam::atomic::AtomicCell;
+use esp_hal::{Blocking, rmt::*};
 use esp_hal::{gpio::Level, time::Rate};
 
 use crate::color::{ChannelOrder, ColorChannels};
 use crate::{Symbol, WS2812, WS2812Error, bits::*};
 
-pub struct EspWS2812<Tx: TxChannel, const N_COLOR_CHANNELS: usize, const N_PX: usize> {
-    tx: Tx,
+enum ChannelStatus<Tx> {
+    Ready(Tx),
+    Busy,
+}
+
+type SenderTx<const CH: u8> = Channel<Blocking, ConstChannelAccess<Tx, CH>>;
+
+pub struct EspWS2812<const CH: u8, const N_COLOR_CHANNELS: usize> {
+    tx: AtomicCell<ChannelStatus<SenderTx<CH>>>,
     p1: u32,
     p0: u32,
     color_order: ChannelOrder<N_COLOR_CHANNELS>,
 }
 
-impl<Tx: TxChannel, const N_COLOR_CHANNELS: usize, const N_PX: usize> EspWS2812<Tx, N_COLOR_CHANNELS, N_PX> {
-    pub fn new(tx: Tx, clk_freq: Rate, color_order: ChannelOrder<N_COLOR_CHANNELS>) -> Self {
+impl<const CH: u8, const N_COLOR_CHANNELS: usize> EspWS2812<CH, N_COLOR_CHANNELS> {
+    pub fn new(
+        tx: SenderTx<CH>,
+        clk_freq: Rate,
+        color_order: ChannelOrder<N_COLOR_CHANNELS>,
+    ) -> Self {
         EspWS2812 {
-            tx,
+            tx: AtomicCell::new(ChannelStatus::Ready(tx)),
             p1: symbol_to_pulse_code(&clk_freq, &Symbol::T1),
             p0: symbol_to_pulse_code(&clk_freq, &Symbol::T0),
             color_order,
@@ -47,13 +60,13 @@ fn symbol_to_pulse_code(clk_rate: &Rate, symbol: &Symbol) -> u32 {
     PulseCode::new(Level::High, high_ticks, Level::Low, low_ticks)
 }
 
-impl<Tx: TxChannel, const N_COLOR_CHANNELS: usize, const N_PX: usize> WS2812<N_COLOR_CHANNELS>
-    for EspWS2812<Tx, N_COLOR_CHANNELS, N_PX>
+impl<const CH: u8, const N_COLOR_CHANNELS: usize> WS2812<N_COLOR_CHANNELS>
+    for EspWS2812<CH, N_COLOR_CHANNELS>
 {
     fn write<Px: ColorChannels<u8, N_COLOR_CHANNELS>>(
-        self,
+        &self,
         pixels: impl Iterator<Item = Px>,
-    ) -> Result<Self, WS2812Error> {
+    ) -> Result<(), WS2812Error> {
         use core::iter;
 
         let end: u32 = PulseCode::empty();
@@ -62,20 +75,29 @@ impl<Tx: TxChannel, const N_COLOR_CHANNELS: usize, const N_PX: usize> WS2812<N_C
             .flat_map(|channel| channel.to_bits())
             .map(|s| if s { self.p1 } else { self.p0 })
             .chain(iter::once(end))
-            .collect::<heapless::Vec<u32, N_PX>>();
+            .collect::<Vec<_>>();
 
-        let tx = self.tx.transmit(data.as_slice()).map_err(|e| e.into())?;
+        if let ChannelStatus::Ready(tx) = self.tx.swap(ChannelStatus::Busy) {
+            let transaction = tx.transmit(data.as_slice()).map_err(|e| e.into())?;
 
-        let tx: Tx = tx.wait().map_err(|(e, _)| e.into())?;
+            let tx = transaction.wait().map_err(|(e, tx)| {
+                // restore the channel to ready state before returning the error.
+                self.tx.store(ChannelStatus::Ready(tx));
+                e.into()
+            })?;
 
-        Ok(EspWS2812 { tx, ..self })
+            self.tx.store(ChannelStatus::Ready(tx));
+            Ok(())
+        } else {
+            Err(WS2812Error::new(
+                "tx channel unavailable and is probably being used by another task.",
+            ))
+        }
     }
 }
 
-impl Into<WS2812Error> for esp_hal::rmt::Error {
-    fn into(self) -> WS2812Error {
-        WS2812Error {
-            msg: format!("ESP RMT Error: {:?}", self),
-        }
+impl<'m> Into<WS2812Error<'m>> for esp_hal::rmt::Error {
+    fn into(self) -> WS2812Error<'m> {
+        WS2812Error::new(format!("ESP RMT Error: {:?}", self))
     }
 }

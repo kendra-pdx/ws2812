@@ -8,29 +8,24 @@ num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 derive-new = { version = "0.7" }
 thiserror = { version = "2.0", default-features = false }
 cfg-if = { version = "1.0" }
-heapless = { version = "0.8" }
 
 # optional dependencies
-esp-hal = { version = "1.0.0-beta.1", optional = true, features = [
+crossbeam = { version = "0.8", optional = true, default-features = false }
+
+esp-hal = { version = "1.0.0-rc.0", optional = true, features = [
   "defmt",
   "unstable",
-] }
-
-bevy_color = { version = "0.16", optional = true, default-features = false, features = [
-  "alloc",
-  "libm",
 ] }
 
 defmt = { version = "1.0", optional = true }
 
 [features]
-testing = ["bevy"]
-default = ["bevy", "esp", "defmt"]
+testing = []
+default = ["esp", "defmt", "esp32"]
 
-esp = ["dep:esp-hal"]
+esp = ["dep:esp-hal", "dep:crossbeam"]
 esp32s3 = ["esp-hal?/esp32s3"]
 esp32 = ["esp-hal?/esp32"]
-bevy = ["dep:bevy_color"]
 defmt = ["dep:defmt"]
 std = []
 
