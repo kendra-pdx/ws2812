@@ -13,18 +13,22 @@ enum ChannelStatus<Tx> {
     Busy,
 }
 
-type SenderTx<const CH: u8> = Channel<Blocking, ConstChannelAccess<Tx, CH>>;
+type SenderTx<const RMT_CH: u8> = Channel<Blocking, ConstChannelAccess<Tx, RMT_CH>>;
 
-pub struct EspWS2812<const CH: u8, const N_COLOR_CHANNELS: usize> {
-    tx: AtomicCell<ChannelStatus<SenderTx<CH>>>,
+pub struct EspWS2812<const RMT_CH: u8, const N_COLOR_CHANNELS: usize> {
+    // the RMT transmit channel
+    tx: AtomicCell<ChannelStatus<SenderTx<RMT_CH>>>,
+    // the pulse code for a '1' bit
     p1: u32,
+    // the pulse code for a '0' bit
     p0: u32,
+    // the order of the color channels
     color_order: ChannelOrder<N_COLOR_CHANNELS>,
 }
 
-impl<const CH: u8, const N_COLOR_CHANNELS: usize> EspWS2812<CH, N_COLOR_CHANNELS> {
+impl<const RMT_CH: u8, const N_COLOR_CHANNELS: usize> EspWS2812<RMT_CH, N_COLOR_CHANNELS> {
     pub fn new(
-        tx: SenderTx<CH>,
+        tx: SenderTx<RMT_CH>,
         clk_freq: Rate,
         color_order: ChannelOrder<N_COLOR_CHANNELS>,
     ) -> Self {
@@ -60,8 +64,8 @@ fn symbol_to_pulse_code(clk_rate: &Rate, symbol: &Symbol) -> u32 {
     PulseCode::new(Level::High, high_ticks, Level::Low, low_ticks)
 }
 
-impl<const CH: u8, const N_COLOR_CHANNELS: usize> WS2812<N_COLOR_CHANNELS>
-    for EspWS2812<CH, N_COLOR_CHANNELS>
+impl<const RMT_CH: u8, const N_COLOR_CHANNELS: usize> WS2812<N_COLOR_CHANNELS>
+    for EspWS2812<RMT_CH, N_COLOR_CHANNELS>
 {
     fn write<Px: ColorChannels<u8, N_COLOR_CHANNELS>>(
         &self,
@@ -78,10 +82,13 @@ impl<const CH: u8, const N_COLOR_CHANNELS: usize> WS2812<N_COLOR_CHANNELS>
             .collect::<Vec<_>>();
 
         if let ChannelStatus::Ready(tx) = self.tx.swap(ChannelStatus::Busy) {
+            // note: in case of an error, the state can never again become 'Ready'
+            // todo: should this just panic?
             let transaction = tx.transmit(data.as_slice()).map_err(|e| e.into())?;
 
+            // the `wait` can fail, but when it does, it returns the channel, and we can try again.
+            // restore the channel to ready state before returning the error.
             let tx = transaction.wait().map_err(|(e, tx)| {
-                // restore the channel to ready state before returning the error.
                 self.tx.store(ChannelStatus::Ready(tx));
                 e.into()
             })?;
