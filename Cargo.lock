@@ -1243,6 +1243,7 @@ dependencies = [
  "defmt 1.0.1",
  "derive-new",
  "esp-hal",
+ "heapless",
  "num-traits",
  "thiserror",
 ]

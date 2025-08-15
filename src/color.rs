@@ -21,8 +21,8 @@ pub struct RGBW<C: Num> {
 
 pub type RGB8 = RGB<u8>;
 pub type RGBF = RGB<f32>;
-pub type RGBW8 = RGB<u8>;
-pub type RGBWF = RGB<f32>;
+pub type RGBW8 = RGBW<u8>;
+pub type RGBWF = RGBW<f32>;
 
 impl<C: Num> RGB<C> {
     pub const fn new(r: C, g: C, b: C) -> Self {
@@ -77,7 +77,19 @@ impl Into<RGB8> for RGBF {
         let r = (self.r * 255.).to_u8().unwrap_or(0);
         let g = (self.g * 255.).to_u8().unwrap_or(0);
         let b = (self.b * 255.).to_u8().unwrap_or(0);
+
         RGB8::new(r, g, b)
+    }
+}
+
+impl Into<RGBW8> for RGBWF {
+    fn into(self) -> RGBW8 {
+        let r = (self.r * 255.).to_u8().unwrap_or(0);
+        let g = (self.g * 255.).to_u8().unwrap_or(0);
+        let b = (self.b * 255.).to_u8().unwrap_or(0);
+        let w = (self.w * 255.).to_u8().unwrap_or(0);
+
+        RGBW8::new(r, g, b, w)
     }
 }
 

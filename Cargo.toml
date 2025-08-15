@@ -8,6 +8,7 @@ num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 derive-new = { version = "0.7" }
 thiserror = { version = "2.0", default-features = false }
 cfg-if = { version = "1.0" }
+heapless = { version = "0.8" }
 
 # optional dependencies
 crossbeam = { version = "0.8", optional = true, default-features = false }
@@ -21,11 +22,12 @@ defmt = { version = "1.0", optional = true }
 
 [features]
 testing = []
-default = ["esp", "defmt", "esp32"]
+default = ["esp32s3"]
 
-esp = ["dep:esp-hal", "dep:crossbeam"]
-esp32s3 = ["esp-hal?/esp32s3"]
-esp32 = ["esp-hal?/esp32"]
+esp = ["defmt", "dep:esp-hal", "dep:crossbeam"]
+esp32s3 = ["esp", "esp-hal?/esp32s3"]
+esp32 = ["esp", "esp-hal?/esp32"]
+
 defmt = ["dep:defmt"]
 std = []
 

@@ -72,8 +72,8 @@ impl<const RMT_CH: u8, const N_COLOR_CHANNELS: usize> WS2812<N_COLOR_CHANNELS>
         pixels: impl Iterator<Item = Px>,
     ) -> Result<(), WS2812Error> {
         use core::iter;
-
         let end: u32 = PulseCode::empty();
+
         let data = pixels
             .flat_map(|px| px.channels(self.color_order))
             .flat_map(|channel| channel.to_bits())
