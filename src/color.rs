@@ -1,3 +1,5 @@
+use core::{ops::Mul, u8};
+
 use num_traits::{Num, ToPrimitive};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -21,6 +23,7 @@ pub struct RGBW<C: Num> {
 
 pub type RGB8 = RGB<u8>;
 pub type RGBF = RGB<f32>;
+
 pub type RGBW8 = RGBW<u8>;
 pub type RGBWF = RGBW<f32>;
 
@@ -36,18 +39,59 @@ impl<C: Num> RGBW<C> {
     }
 }
 
+impl Mul<f32> for RGBW8 {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        assert!(rhs >= 0.0 && rhs <= 1.0);
+        let RGBW8 { r, g, b, w } = self;
+
+        let scale = move |v: u8| {
+            const MAX_U8_F: f32 = u8::MAX as f32;
+            let v = v as f32;
+            let v: f32 = (v / MAX_U8_F * rhs) * MAX_U8_F;
+            v as u8
+        };
+
+        RGBW8 {
+            r: scale(r),
+            g: scale(g),
+            b: scale(b),
+            w: scale(w),
+        }
+    }
+}
+
+impl Mul<f32> for RGBWF {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        assert!(rhs >= 0.0 && rhs <= 1.0);
+        let RGBWF { r, g, b, w } = self;
+        let scale = move |v: f32| v * rhs;
+
+        RGBWF {
+            r: scale(r),
+            g: scale(g),
+            b: scale(b),
+            w: scale(w),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum Channel {
     R,
     G,
     B,
-    W
+    W,
 }
 
 pub type ChannelOrder<const N: usize> = [Channel; N];
 pub const GRB: ChannelOrder<3> = [Channel::G, Channel::R, Channel::B];
 pub const RGB: ChannelOrder<3> = [Channel::R, Channel::G, Channel::B];
 pub const BGR: ChannelOrder<3> = [Channel::B, Channel::G, Channel::R];
+
 pub const RGBW: ChannelOrder<4> = [Channel::R, Channel::G, Channel::B, Channel::W];
 pub const GRBW: ChannelOrder<4> = [Channel::G, Channel::R, Channel::B, Channel::W];
 pub const BGRW: ChannelOrder<4> = [Channel::B, Channel::G, Channel::R, Channel::W];
@@ -56,9 +100,9 @@ pub trait ColorChannels<C: Num, const N: usize> {
     fn channels(self, order: ChannelOrder<N>) -> [C; N];
 }
 
-impl<const N: usize, RGB: Into<RGB8>> ColorChannels<u8, N> for RGB {
-    fn channels(self, order: ChannelOrder<N>) -> [u8; N] {
-        let mut result = [0; N];
+impl<RGB: Into<RGB8>> ColorChannels<u8, 3> for RGB {
+    fn channels(self, order: ChannelOrder<3>) -> [u8; 3] {
+        let mut result = [0; 3];
         let RGB8 { r, g, b } = self.into();
         for (i, &channel) in order.iter().enumerate() {
             match channel {
@@ -66,6 +110,22 @@ impl<const N: usize, RGB: Into<RGB8>> ColorChannels<u8, N> for RGB {
                 Channel::G => result[i] = g,
                 Channel::B => result[i] = b,
                 Channel::W => result[i] = 0, // White channel is not supported in RGB8
+            }
+        }
+        result
+    }
+}
+
+impl<RGBW: Into<RGBW8>> ColorChannels<u8, 4> for RGBW {
+    fn channels(self, order: ChannelOrder<4>) -> [u8; 4] {
+        let mut result = [0; 4];
+        let RGBW8 { r, g, b, w } = self.into();
+        for (i, &channel) in order.iter().enumerate() {
+            match channel {
+                Channel::R => result[i] = r,
+                Channel::G => result[i] = g,
+                Channel::B => result[i] = b,
+                Channel::W => result[i] = w,
             }
         }
         result

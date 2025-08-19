@@ -70,7 +70,7 @@ where
     fn write<Px: ColorChannels<u8, N_COLOR_CHANNELS>>(
         &self,
         pixels: impl Iterator<Item = Px>,
-    ) -> Result<(), WS2812Error>;
+    ) -> Result<(), WS2812Error<'_>>;
 }
 
 #[cfg(feature = "defmt")]
