@@ -1,4 +1,4 @@
-use core::{ops::Mul, u8};
+use core::{ops::{Div, Mul}, u8};
 
 use num_traits::{Num, ToPrimitive};
 
@@ -142,6 +142,15 @@ impl Into<RGB8> for RGBF {
     }
 }
 
+impl Into<RGBF> for RGB8 {
+    fn into(self) -> RGBF {
+        let r = (self.r / u8::MAX).to_f32().unwrap_or_default();
+        let g = (self.g / u8::MAX).to_f32().unwrap_or_default();
+        let b = (self.b / u8::MAX).to_f32().unwrap_or_default();
+        RGBF::new(r, g, b)
+    }
+}
+
 impl Into<RGBW8> for RGBWF {
     fn into(self) -> RGBW8 {
         let r = (self.r * 255.).to_u8().unwrap_or(0);
@@ -150,6 +159,67 @@ impl Into<RGBW8> for RGBWF {
         let w = (self.w * 255.).to_u8().unwrap_or(0);
 
         RGBW8::new(r, g, b, w)
+    }
+}
+
+pub trait Top {
+    fn top() -> Self;
+}
+
+impl Top for f32 {
+    #[inline]
+    fn top() -> f32 {
+        1.0
+    }
+}
+
+impl Top for u8 {
+    #[inline]
+    fn top() -> u8 {
+        u8::MAX
+    }
+}
+
+fn min<T: PartialOrd>(a: T, b: T) -> T {
+    if a < b { a } else { b }
+}
+
+macro_rules! min {
+    ($a:expr) => {
+        $a
+    };
+    ($a:expr, $b:expr) => {
+        min($a, $b)
+    };
+    ($a:expr, $($bs:expr),+) => {
+        min($a, min!($($bs),+))
+    }
+}
+
+impl<C: Num + PartialOrd + Copy + Top> RGB<C> {
+    // https://github.com/BertanT/Arduino-RGBWConverter/blob/main/src/RGBWConverter.cpp
+    pub fn to_rgbw(&self, white_temp: Self) -> RGBW<C> {
+        let w_r = self.r * (C::top() / white_temp.r);
+        let w_g = self.g * (C::top() / white_temp.g);
+        let w_b = self.b * (C::top() / white_temp.b);
+
+        let w_min = min!(w_r, w_g, w_b);
+
+        let w = if w_min == w_r {
+            self.r
+        } else if w_min == w_g {
+            self.g
+        } else {
+            self.b
+        };
+
+        let r = self.r - w * (white_temp.r / C::top());
+        let g = self.g - w * (white_temp.g / C::top());
+        let b = self.b - w * (white_temp.b / C::top());
+
+        RGBW {
+            r, g, b, w
+        }
     }
 }
 

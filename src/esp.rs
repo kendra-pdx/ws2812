@@ -81,31 +81,33 @@ impl<const RMT_CH: u8, const N_COLOR_CHANNELS: usize> WS2812<N_COLOR_CHANNELS>
             .chain(iter::once(end))
             .collect::<Vec<_>>();
 
-        if let ChannelStatus::Ready(tx) = self.tx.swap(ChannelStatus::Busy) {
-            // note: in case of an error, the state can never again become 'Ready'
-            // todo: should this just panic? i don't see a way to recover from this.
-            let transaction = tx.transmit(data.as_slice()).map_err(|e| e.into())?;
+        critical_section::with(|_cs| {
+            if let ChannelStatus::Ready(tx) = self.tx.swap(ChannelStatus::Busy) {
+                // note: in case of an error, the state can never again become 'Ready'
+                // todo: should this just panic? i don't see a way to recover from this.
+                let transaction = tx.transmit(data.as_slice()).map_err(|e| e.into())?;
 
-            // the `wait` can fail, but when it does, it returns the channel, and we can try again.
-            // restore the channel to ready state before returning the error.
-            let result = transaction.wait().map_err(|(e, tx)| (e.into(), tx));
+                // the `wait` can fail, but when it does, it returns the channel, and we can try again.
+                // restore the channel to ready state before returning the error.
+                let result = transaction.wait().map_err(|(e, tx)| (e.into(), tx));
 
-            // extract the channel and the final result from transaction.
-            let (result, tx) = if let Ok(tx) = result {
-                (Ok(()), tx)
-            } else if let Err((e, tx)) = result {
-                (Err(e), tx)
+                // extract the channel and the final result from transaction.
+                let (result, tx) = if let Ok(tx) = result {
+                    (Ok(()), tx)
+                } else if let Err((e, tx)) = result {
+                    (Err(e), tx)
+                } else {
+                    unreachable!()
+                };
+
+                self.tx.store(ChannelStatus::Ready(tx));
+                result
             } else {
-                unreachable!()
-            };
-
-            self.tx.store(ChannelStatus::Ready(tx));
-            result
-        } else {
-            Err(WS2812Error::new(
-                "tx channel unavailable and is probably being used by another task.",
-            ))
-        }
+                Err(WS2812Error::new(
+                    "tx channel unavailable and is probably being used by another task.",
+                ))
+            }
+        })
     }
 }
 

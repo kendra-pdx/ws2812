@@ -1310,11 +1310,11 @@ name = "ws2812"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
+ "critical-section",
  "crossbeam",
  "defmt 1.0.1",
  "derive-new",
  "esp-hal",
- "heapless",
  "num-traits",
  "thiserror",
 ]
